@@ -26,16 +26,17 @@ def expected_request(expected_action, expected_data):
         'data': expected_data
     }
 
-def test_action_get_echo(expected_request):
+
+def test_action_get_echo(expected_request, expected_action):
     actual_response = get_echo(expected_request)
-    assert actual_response.get('action') == 'echo'
+    assert actual_response.get('action') == expected_action
 
 
-def test_code_get_echo(expected_request):
+def test_code_get_echo(expected_request, expected_code):
     actual_response = get_echo(expected_request)
-    assert actual_response.get('code') == 200
+    assert actual_response.get('code') == expected_code
 
 
-def test_data_get_echo(expected_request):
+def test_data_get_echo(expected_request, expected_data):
     actual_response = get_echo(expected_request)
-    assert actual_response.get('data') == 'Echo, bitch'
+    assert actual_response.get('data') == expected_data
