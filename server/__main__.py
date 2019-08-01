@@ -1,6 +1,7 @@
 import socket
 import json
 import time
+import logging
 from protocol import validate_request, make_response
 from actions import resolve
 
@@ -20,6 +21,16 @@ if args.config:
         file_config = json.load(file)
         config.update(file_config)
 
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers = [
+        logging.FileHandler('main.log'),
+        logging.StreamHandler()
+    ]
+)
+
 host, port = config.get('host'), config.get('port')
 
 
@@ -28,13 +39,13 @@ try:
     sock.bind((host, port))
     sock.listen(5)
 
-    print("server started with {}:{} at {}".format(host, port, time.ctime()))
+    logging.info("server started with {}:{} at {}".format(host, port, time.ctime()))
 
     while True:
         client, address = sock.accept()
-        print('Client was detected {}:{} at {} '.format(address[0], address[1], time.ctime()))
+        logging.info('Client was detected {}:{} at {} '.format(address[0], address[1], time.ctime()))
 
-        b_request = client.recv(config.get('buffersize')) # принимаем сообщение клиента
+        b_request = client.recv(config.get('buffersize'))  # принимаем сообщение клиента
 
         message = json.loads(b_request.decode())
 
@@ -44,19 +55,19 @@ try:
             if controller:
 
                 try:
-                    print('Valid client was identified as {}. Request sent: {}'.format(message['user']['account_name'], message))
+                    logging.info('Valid client was identified as {}. Request sent: {}'.format(message['user']['account_name'], message))
                     response = controller(message)
                 except Exception as err:
-                    print(f'Internal server error: {err}')
+                    logger.critical(f'Internal server error: {err}')
                     response = make_response(message, 500, data='Internal Server Error')
 
             else:
-                print(f'Controller with action name {actions_name} does not exist.')
+                logging.error(f'Controller with action name {actions_name} does not exist.')
                 response = make_response(message, 404, 'Action not found')
 
         else:
 
-            print('Invalid request{}'.format(message))
+            logging.error('Invalid request{}'.format(message))
             response = make_response(message, 404, 'Wrong request')
 
         client.send(json.dumps(response).encode())
@@ -64,5 +75,4 @@ try:
         client.close()
 
 except KeyboardInterrupt:
-    print()
-    print('Server was shut down')
+    logging.info('Server was shut down')
