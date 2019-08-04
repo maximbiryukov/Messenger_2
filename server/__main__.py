@@ -2,8 +2,9 @@ import socket
 import json
 import time
 import logging
-from protocol import validate_request, make_response
-from actions import resolve
+import select
+
+from handlers import handle_default_request
 
 from argparse import ArgumentParser
 
@@ -31,48 +32,46 @@ logging.basicConfig(
     ]
 )
 
+connections = []
+requests = []
+
 host, port = config.get('host'), config.get('port')
 
 
 try:
     sock = socket.socket()
     sock.bind((host, port))
+    sock.settimeout(0)
     sock.listen(5)
 
     logging.info("server started with {}:{} at {}".format(host, port, time.ctime()))
 
     while True:
-        client, address = sock.accept()
-        logging.info('Client was detected {}:{} at {} '.format(address[0], address[1], time.ctime()))
+        try:
+            client, address = sock.accept()
+            logging.info('Client was detected {}:{} at {} '.format(address[0], address[1], time.ctime()))
+            connections.append(client)
+        except:
+            pass
 
-        b_request = client.recv(config.get('buffersize'))  # принимаем сообщение клиента
+        rlist, wlist, xlist = select.select(
+            connections, connections, connections, 0
+        )
 
-        message = json.loads(b_request.decode())
+        for read_client in rlist:
+            bytes_request = read_client.recv(config.get('buffersize'))
+            requests.append(bytes_request)
 
-        if validate_request(message):
-            actions_name = message.get('action')
-            controller = resolve(actions_name)
-            if controller:
+        if requests:
+            bytes_request = requests.pop()
+            bytes_response = handle_default_request(bytes_request)
 
-                try:
-                    logging.info('Valid client was identified as {}. Request sent: {}'.format(message['user']['account_name'], message))
-                    response = controller(message)
-                except Exception as err:
-                    logger.critical(f'Internal server error: {err}')
-                    response = make_response(message, 500, data='Internal Server Error')
+            for write_client in wlist:
+                write_client.send(bytes_response)
 
-            else:
-                logging.error(f'Controller with action name {actions_name} does not exist.')
-                response = make_response(message, 404, 'Action not found')
+            for read_client in rlist:
+                read_client.send(bytes_response)
 
-        else:
-
-            logging.error('Invalid request{}'.format(message))
-            response = make_response(message, 404, 'Wrong request')
-
-        client.send(json.dumps(response).encode())
-
-        client.close()
 
 except KeyboardInterrupt:
     logging.info('Server was shut down')
