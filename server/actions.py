@@ -18,6 +18,7 @@ def get_server_actions():
         lambda value, item: value + getattr(item, 'action_names'), actions,
         [])
 
+
 def resolve(action_name, actions = None):
     action_list = actions or get_server_actions()
     action_mapping = {
